@@ -751,7 +751,7 @@ function PeriodTab({records,onSave}){
 }
 
 // ── History ────────────────────────────────────────────────
-function History({records,onDelete}){
+function History({records,onDelete,onEdit}){
   const[filter,setFilter]=useState("all");
   const filtered=filter==="all"?records:records.filter(r=>r.cat===filter);
   const grouped=useMemo(()=>{
@@ -776,6 +776,7 @@ function History({records,onDelete}){
               {recs.map(r=>(
                 <div key={r.id} style={{display:"flex",alignItems:"center",gap:6}}>
                   <div style={{flex:1}}><RecordRow r={r}/></div>
+                  <button onClick={()=>onEdit(r)} style={{background:"none",border:`1px solid ${C.border}`,color:C.sub,cursor:"pointer",fontSize:12,padding:"4px 8px",borderRadius:6,fontWeight:600}}>編集</button>
                   <button onClick={()=>onDelete(r.id)} style={{background:"none",border:"none",color:C.muted,cursor:"pointer",fontSize:16,padding:"4px 8px",borderRadius:6}}>×</button>
                 </div>
               ))}
@@ -787,8 +788,89 @@ function History({records,onDelete}){
   );
 }
 
+// ── Edit Form ───────────────────────────────────────────────
+function EditForm({record,onSave,onCancel}){
+  const[fields,setFields]=useState({...record.fields});
+  const[note,setNote]=useState(record.note||"");
+  const f=(k,v)=>setFields(p=>({...p,[k]:v}));
+  const m=DETAIL_CATS[record.cat];
 
-// ── Record Tab ─────────────────────────────────────────────
+  const form={
+    weight:()=>(
+      <>
+        <Inp label="体重" value={fields.weight||""} onChange={v=>f("weight",v)} type="number" placeholder="60.0" unit="kg"/>
+        <Inp label="体脂肪率（任意）" value={fields.fat||""} onChange={v=>f("fat",v)} type="number" placeholder="25.0" unit="%"/>
+        <Inp label="ウエスト（任意）" value={fields.waist||""} onChange={v=>f("waist",v)} type="number" placeholder="75" unit="cm"/>
+      </>
+    ),
+    meal:()=>(
+      <>
+        <Sel label="食事" value={fields.mealType||"朝食"} onChange={v=>f("mealType",v)} options={[{value:"朝食",label:"朝食"},{value:"昼食",label:"昼食"},{value:"夕食",label:"夕食"},{value:"間食",label:"間食"}]}/>
+        <Inp label="カロリー（任意）" value={fields.calories||""} onChange={v=>f("calories",v)} type="number" placeholder="600" unit="kcal"/>
+        <Inp label="食べたもの（任意）" value={fields.food||""} onChange={v=>f("food",v)} placeholder="ご飯、味噌汁…"/>
+      </>
+    ),
+    exercise:()=>(
+      <>
+        <Inp label="種類" value={fields.exType||""} onChange={v=>f("exType",v)} placeholder="ウォーキング…"/>
+        <Inp label="時間" value={fields.duration||""} onChange={v=>f("duration",v)} type="number" placeholder="30" unit="分"/>
+        <Inp label="消費カロリー（任意）" value={fields.burned||""} onChange={v=>f("burned",v)} type="number" placeholder="150" unit="kcal"/>
+      </>
+    ),
+    sleep:()=>(
+      <>
+        <Inp label="就寝" value={fields.bedtime||""} onChange={v=>f("bedtime",v)} type="time"/>
+        <Inp label="起床" value={fields.wakeup||""} onChange={v=>f("wakeup",v)} type="time"/>
+        <Sel label="睡眠の質" value={fields.quality||"普通"} onChange={v=>f("quality",v)} options={[{value:"ぐっすり",label:"😴 ぐっすり"},{value:"普通",label:"😶 普通"},{value:"浅かった",label:"😪 浅かった"},{value:"眠れなかった",label:"😩 眠れなかった"}]}/>
+      </>
+    ),
+    condition:()=>(
+      <>
+        <Sel label="体調" value={fields.overall||"普通"} onChange={v=>f("overall",v)} options={[{value:"とても良い",label:"😄 とても良い"},{value:"良い",label:"🙂 良い"},{value:"普通",label:"😐 普通"},{value:"悪い",label:"😔 悪い"},{value:"とても悪い",label:"🤒 とても悪い"}]}/>
+        <Inp label="症状（任意）" value={fields.symptoms||""} onChange={v=>f("symptoms",v)} placeholder="頭痛、疲れ…"/>
+        <Inp label="体温（任意）" value={fields.temp||""} onChange={v=>f("temp",v)} type="number" placeholder="36.5" unit="℃"/>
+      </>
+    ),
+    period:()=>(
+      <>
+        <Sel label="記録の種類" value={fields.periodType||"開始"} onChange={v=>f("periodType",v)} options={[{value:"開始",label:"🌸 開始"},{value:"終了",label:"✓ 終了"},{value:"経過中",label:"📍 経過中"}]}/>
+        <Sel label="量" value={fields.flow||"普通"} onChange={v=>f("flow",v)} options={[{value:"多い",label:"多い"},{value:"普通",label:"普通"},{value:"少ない",label:"少ない"}]}/>
+        <Inp label="症状（任意）" value={fields.pSymptoms||""} onChange={v=>f("pSymptoms",v)} placeholder="腹痛、腰痛…"/>
+      </>
+    ),
+    bowel:()=>(
+      <>
+        <Sel label="結果" value={fields.bowelResult||"出た"} onChange={v=>f("bowelResult",v)} options={[{value:"出た",label:"✅ 出た"},{value:"少し出た",label:"🔸 少し出た"},{value:"出なかった",label:"❌ 出なかった"}]}/>
+        <Sel label="状態（任意）" value={fields.bowelType||""} onChange={v=>f("bowelType",v)} options={[{value:"",label:"— 選択しない —"},{value:"普通",label:"😊 普通"},{value:"やわらかい",label:"💧 やわらかい"},{value:"かたい",label:"🪨 かたい"},{value:"下痢気味",label:"⚡下痢気味"}]}/>
+      </>
+    ),
+  };
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+      <div style={{display:"flex",alignItems:"center",gap:10,padding:"4px 0"}}>
+        <button onClick={onCancel} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:C.sub}}>←</button>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <div style={{width:32,height:32,borderRadius:10,background:m.light,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>{m.icon}</div>
+          <p style={{margin:0,fontSize:15,fontWeight:800,color:C.ink}}>{m.label}を編集</p>
+        </div>
+      </div>
+      <p style={{margin:0,fontSize:11,color:C.muted}}>{record.date} {record.time}</p>
+      <Card>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {form[record.cat]&&form[record.cat]()}
+          <Inp label="メモ（任意）" value={note} onChange={setNote} placeholder="自由記入…"/>
+        </div>
+      </Card>
+      <button onClick={()=>onSave({...record,fields,note})} style={{width:"100%",padding:"13px",borderRadius:12,border:"none",background:C.mint,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>
+        保存する
+      </button>
+      <button onClick={onCancel} style={{width:"100%",padding:"11px",borderRadius:12,border:`1px solid ${C.border}`,background:"transparent",color:C.sub,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+        キャンセル
+      </button>
+    </div>
+  );
+}
 function RecordTab({records,onSave}){
   const[mode,setMode]=useState("quick");
   return(
@@ -809,19 +891,43 @@ const TABS=[
   {id:"record",label:"記録",icon:"＋"},
   {id:"insights",label:"分析",icon:"📊"},
   {id:"period",label:"月経",icon:"🌸"},
+  {id:"history",label:"履歴",icon:"📋"},
 ];
 
 export default function HealthApp(){
   const[tab,setTab]=useState("dashboard");
-  const[records,setRecords]=useState([]);
+  const[records,setRecords]=useState(()=>{
+    try {
+      const saved = localStorage.getItem("health-records");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const[toast,setToast]=useState("");
-  function handleSave(r){setRecords(p=>[...p,r]);setToast("✓ 記録しました！");setTimeout(()=>setToast(""),1800);}
-  function handleDelete(id){setRecords(p=>p.filter(r=>r.id!==id));}
+  const[editTarget,setEditTarget]=useState(null);
+
+  function saveRecords(newRecords){
+    setRecords(newRecords);
+    try { localStorage.setItem("health-records", JSON.stringify(newRecords)); } catch {}
+  }
+
+  function handleSave(r){saveRecords([...records,r]);setToast("✓ 記録しました！");setTimeout(()=>setToast(""),1800);}
+  function handleDelete(id){saveRecords(records.filter(r=>r.id!==id));}
+  function handleEdit(r){setEditTarget(r);setTab("edit");}
+  function handleUpdate(updated){
+    saveRecords(records.map(r=>r.id===updated.id?updated:r));
+    setEditTarget(null);
+    setToast("✓ 編集しました！");
+    setTimeout(()=>setToast(""),1800);
+    setTab("history");
+  }
+
   const pages={
     dashboard:<Dashboard records={records}/>,
     record:<RecordTab records={records} onSave={handleSave}/>,
     insights:<InsightsTab records={records}/>,
     period:<PeriodTab records={records} onSave={handleSave}/>,
+    history:<History records={records} onDelete={handleDelete} onEdit={handleEdit}/>,
+    edit: editTarget ? <EditForm record={editTarget} onSave={handleUpdate} onCancel={()=>setTab("history")}/> : null,
   };
   return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Hiragino Sans','Yu Gothic UI',sans-serif"}}>
